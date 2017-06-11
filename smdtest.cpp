@@ -63,10 +63,6 @@ void SMDTest::Exec()
   //
   time(&tStart);
   //
-#if	0==1
-  sleep(90);
-#endif
-  //
   while(!epilogPoll())
     Yield();
   //
