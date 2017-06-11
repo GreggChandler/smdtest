@@ -11,7 +11,6 @@
 #define	ESXSTALLS	0	/* Non-Zero for Stalls		*/
 #define	ESXLOOPCOUNT	0	/* Non-Zero for Loop Count	*/
 #define	ESXRESULTS	0	/* Non-Zero for Results Array	*/
-#define	ESXTWOREAD	0	/* Non-Zero for Two Reads	*/
 
 #include	<stdio.h>
 #include	<stdlib.h>
@@ -82,7 +81,7 @@ class eSMDTest : public ESXAppCore {
       bResults = false;
 #endif
 #endif
-      bStalls = false;
+      bStalls = true;
       uTestCoreFirst = 0;
 #if	0==1
       uTestCoreLast = epiConfigCore.CoreCount()-1;
@@ -187,7 +186,6 @@ void eSMDTest::ProcessArgs(uint uThread,int iArgCount,LPCTSTR pArgValues[])
     //epiPrintF("[%d]ArgCount: %d\n",uThread,iArgCountSave);
     for(i=0;i<iArgCountSave;i++)
       epiPrintF("[%d]Arg[%d]: %s\n",uThread,i,pArgValuesSave[i]);
-    epiPrintF("ESXTWOREAD: %d\n",ESXTWOREAD);
     };
   }
 
@@ -207,8 +205,10 @@ int eSMDTest::Exec(uint uThread)
   uint		uMin;
   uint		uHistValue;
   uint		uMeasurement;
+  uint		uStalls;
   uint		uStallStart;
   uint		uStallStop;
+  uint		uStallTare;
   uint		uTotal;
   //
   register volatile uint *	pInt;
@@ -251,10 +251,14 @@ int eSMDTest::Exec(uint uThread)
 	{
         ESXEpiCore::Interrupts::GlobalEnable(false);
 	ESXEpiCore::SleepInCore(1,10);
+	ESXEpiCore::Timer::Write(E_CTIMER_1,E_CTIMER_MAX);
+	uStallStart = ESXEpiCore::Timer::Start(E_CTIMER_1,E_CTIMER_EXT_LOAD_STALLS);
 	ESXEpiCore::Timer::Write(E_CTIMER_0,E_CTIMER_MAX);
 	uStart = ESXEpiCore::Timer::Start(E_CTIMER_0,E_CTIMER_CLK);
 	uStop = ESXEpiCore::Timer::Read(E_CTIMER_0);
+	uStallStop = ESXEpiCore::Timer::Read(E_CTIMER_1);
 	uTare = uStart - uStop;
+	uStallTare = uStallStart - uStallStop;
 	//
 	//for(i=0;i<ESXMAXSAMPLES;i++)
 	for(i=0;i<5000;i++)
@@ -279,28 +283,46 @@ int eSMDTest::Exec(uint uThread)
 	    __asm volatile (" nop ");
 	    };
 	  //ESXEpiCore::mSleepInCore(1,10);
-	  ESXEpiCore::Timer::Write(E_CTIMER_1,E_CTIMER_MAX);
-	  uStallStart = ESXEpiCore::Timer::Start(E_CTIMER_1,E_CTIMER_EXT_LOAD_STALLS);
-          ESXEpiCore::Timer::Write(E_CTIMER_0,E_CTIMER_MAX);
-          uStart = ESXEpiCore::Timer::Start(E_CTIMER_0,E_CTIMER_CLK);
-	  *pInt = uValue;
-	  uTemp0 = *pInt;
-#if	ESXTWOREAD
+	  if(bTestSameCoreMemory || bTestOtherCoreMemory)
+	      {
+	      ESXEpiCore::Timer::Write(E_CTIMER_1,E_CTIMER_MAX);
+	      uStallStart = ESXEpiCore::Timer::Start(E_CTIMER_1,
+	        E_CTIMER_EXT_LOAD_STALLS);
+              ESXEpiCore::Timer::Write(E_CTIMER_0,E_CTIMER_MAX);
+              uStart = ESXEpiCore::Timer::Start(E_CTIMER_0,E_CTIMER_CLK);
+	      *pInt = uValue;
+	      uTemp0 = *pInt;
+	      uStop = ESXEpiCore::Timer::Read(E_CTIMER_0);
+	      uStallStop = ESXEpiCore::Timer::Read(E_CTIMER_1);
+	      }
+	    else
+	      {
+	      ESXEpiCore::Timer::Write(E_CTIMER_1,E_CTIMER_MAX);
+	      uStallStart = ESXEpiCore::Timer::Start(E_CTIMER_1,
+	        E_CTIMER_EXT_LOAD_STALLS);
+              ESXEpiCore::Timer::Write(E_CTIMER_0,E_CTIMER_MAX);
+              uStart = ESXEpiCore::Timer::Start(E_CTIMER_0,E_CTIMER_CLK);
+	      *pInt = uValue;
+	      uTemp0 = *pInt;
+	      if(uTemp0!=uValue)
+	        uTemp0 = *pInt;
+	      uStop = ESXEpiCore::Timer::Read(E_CTIMER_0);
+	      uStallStop = ESXEpiCore::Timer::Read(E_CTIMER_1);
+	      };
+	  uMeasurement = uStart - uStop - uTare;
+	  uStalls = uStallStart - uStallStop - uStallTare;
 	  if(uTemp0!=uValue)
-	    uTemp0 = *pInt;
-#endif
-	  uStop = ESXEpiCore::Timer::Read(E_CTIMER_0);
-	  uStallStop = ESXEpiCore::Timer::Read(E_CTIMER_1);
-	  uMeasurement = uStart-uStop-uTare;
-	  if(uTemp0!=uValue)
+	    {
 	    uMeasurement = 0xffff;
+	    uStalls = 0xffff;
+	    };
 #if	ESXLOOPCOUNT
 	  if(uValue==uTemp0)
 	      uLoopCount = 1;
 	    else
 	      uLoopCount = 0;
 #endif
-          statsCore.Sample(uMeasurement,uStallStart-uStallStop);
+          statsCore.Sample(uMeasurement,uStalls);
 #if	ESXRESULTS
 	  uResults[i] = uMeasurement;
 #endif
@@ -308,7 +330,7 @@ int eSMDTest::Exec(uint uThread)
 	  Hist.Insert(uMeasurement);
 #endif
 #if	ESXSTALLS
-	  uStalls[i] = uStallStart-uStallStop;
+	  uStalls[i] = uStalls;
 #endif
 #if	ESXLOOPCOUNT
 	  uLoopCounts[i] = uLoopCount;
@@ -371,9 +393,10 @@ int eSMDTest::Exec(uint uThread)
       uMax = Hist.Max();
 #endif
       uTotal = 0;
-      epiPrintF("uTare: %u\n",uTare);
-      epiPrintF("uMin:  %u\n",uMin);
-      epiPrintF("uMax:  %u\n",uMax);
+      epiPrintF("uTare:        %u\n",uTare);
+      epiPrintF("uMin:         %u\n",uMin);
+      epiPrintF("uMax:         %u\n",uMax);
+      epiPrintF("uTare-Stalls: %u\n",uStallTare);
 #if	ESXHISTOGRAM
       for(j=uMin;j<=uMax;j++)
 	if((uHistValue=Hist.ValueCount(j))!=0)

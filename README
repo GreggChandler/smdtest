@@ -1,4 +1,17 @@
 This is a simple program for the Adapteva/Epiphany/Parallella system to measure
-different types of memory performance.  ESXTWOREAD must be set in e-smdtest.cpp
-to measure memory accurately.  It should be set to 1 to measure external memory,
-or 0 to measure other core memory or same core memory.
+different types of memory performance.  It attempts to let the mesh network
+acquiesce, and then executes reads.
+
+For Same or Other core memory, smdtest assumes
+that the data will be returned in one read.  For external memory, a worst case
+of two reads should be sufficient to return the data.  Note, two reads is only
+adequate becuase the mesh network is otherwise quiet.
+
+To quiet the network, external polling from the host is diabled by executing
+a remote sleep before the memory tests are executed.  Additionally, the other
+cores are also "idled" via the idle instruction after executing a number of
+NOP instructions.
+
+In an attempt to remove the clocks for the timing, a 'Tare' value is calculated
+by executing the start and stop timer functions and subtracting it from the
+calculated measurements.
