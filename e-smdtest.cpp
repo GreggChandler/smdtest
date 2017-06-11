@@ -450,8 +450,16 @@ void eSMDTest::Help()
   size_t	i;
   if(epiConfigCore.CoreNumber()==0)
     {
-    epiPrintF("-debug"   "\tEnable Debug\n");
-    epiPrintF("-help"    "\tDisplay Help\n");
+    epiPrintF("-debug               Enable Debug\n");
+    epiPrintF("-help                Display Help\n");
+    epiPrintF("-testcore n          Source Core for Test: 0-15\n");
+    epiPrintF("-hibernate-host n    Seconds to Pause Host\n");
+    epiPrintF("-othercore row col   Test Memory On Another Core\n");
+#if	ESXRESULTS
+    epiPrintF("-results             If Enabled, Show All Results\n");
+#endif
+    epiPrintF("-stalls              Show Stalls\n");
+    epiPrintF("-same-core-memory    Test Memory on Test Core\n");
     };
   }
 
