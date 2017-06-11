@@ -2,3 +2,18 @@
 
 #	.o or .a files
 *.[oa]
+
+#	No .map or .elf files
+*.map
+*.elf
+
+#	Folders to Ignore
+
+Ext/
+Other/
+Same/
+
+#	Programs to Ignore
+
+smdcomb
+smdtest

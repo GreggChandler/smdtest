@@ -1,3 +1,4 @@
 This is a simple program for the Adapteva/Epiphany/Parallella system to measure
-different types of memory performance.  ESXTWOREAD must be set to measure
-external memory accurately.
+different types of memory performance.  ESXTWOREAD must be set in e-smdtest.cpp
+to measure memory accurately.  It should be set to 1 to measure external memory,
+or 0 to measure other core memory or same core memory.
