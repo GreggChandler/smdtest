@@ -1,0 +1,3 @@
+This is a simple program for the Adapteva/Epiphany/Parallella system to measure
+different types of memory performance.  ESXTWOREAD must be set to measure
+external memory accurately.
